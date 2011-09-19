@@ -1,7 +1,7 @@
 " initialization part
 python << EOF
 import sys
-sys.path.append('/home/hp-user/box/evernote-api-1.19/lib/python')
+sys.path.append('evernote-api-1.19/lib/python/')
 import os.path
 import evernote.edam.notestore.NoteStore as NoteStore
 import evernote.edam.type.ttypes as Types
@@ -9,73 +9,110 @@ import evernote.edam.error.ttypes as Errors
 import vim
 from evernoteapi import *
 
-#userShardId = 's1'
-#authToken   = 'S=s1:U=e102:E=1323f6893a5:C=1323f31a529:P=37:A=paul356:H=5eca8d432c7eae435ff0f9af335a1b8d'
 userShardId = ''
 authToken   = ''
+notebooks   = []
+allNotes    = {}
+backRef     = {}
+bufIdx      = -1
+noteStore   = None
+evernoteBufferName = '__EVERNOTE_LIST__'
 EOF
 
 function! s:authenticate_user()
 python << EOF
 authFilePath = '/tmp/.evernote_auth'
-if (os.path.exists(authFilePath)):
-    authFile = open(authFilePath, "rb")
-    userShardId = authFile.readline()
-    authToken   = authFile.readline()
-else:
-    userAuth = UserAuth(username, password)
-    authResult = userAuth.authenticateUser()
-    if (authResult == None):
-        print "Authentication fail for ", user.username
-        exit(1);
+userAuth = UserAuth(username, password)
+authResult = userAuth.authenticateUser()
+if (authResult == None):
+    print "Authentication fail for " + user.username
+    exit(1);
 
-    user = authResult.user
-    authToken = authResult.authenticationToken
+user = authResult.user
+userShardId = user.shardId
+authToken = authResult.authenticationToken
 
-    authFile = open(authFilePath, "wb")
-    authFile.write(user.shardId + "\n")
-    authFile.write(authToken + "\n")
-    authFile.close()
-    userShardId = user.shardId
-    authToken   = authResult.authenticationToken
+authFile = open(authFilePath, "wb")
+authFile.write(user.shardId + "\n")
+authFile.write(authToken + "\n")
+authFile.close()
 EOF
 endfunction
 
-function! s:list_notes()
+function! s:get_note_list()
 python << EOF
-print userShardId
-print authToken 
+noteStore = getNoteStore(userShardId)
+
+notebooks = noteStore.listNotebooks(authToken)
+allNotes  = {}
+backRef   = {}
+if debugLogging:
+    print "Found %d notebooks:" % len(notebooks)
+for notebook in notebooks:
+    if debugLogging:
+        print "  * " + notebook.name
+
+    filter = NoteStore.NoteFilter()
+    filter.notebookGuid = notebook.guid
+    noteLst = noteStore.findNotes(authToken, filter, 0, 200)
+    allNotes[notebook.guid] = [];
+    for note in noteLst.notes:
+        if debugLogging:
+            print "------------  title  -------------"
+            print note.title
+            print "------------ content -------------"
+            print note.content
+        allNotes[notebook.guid].append(note)
+EOF
+endfunction
+
+function! s:display_note_list()
+python << EOF
+vim.command('leftabove vertical split ' + evernoteBufferName)
+vim.command('set nowrap')
+vim.command('vertical res 40')
+vim.command('setlocal buftype=nofile')
+vim.command('setlocal noswapfile')
+vim.command('setlocal noreadonly')
+
+del vim.current.buffer[0:len(vim.current.buffer)]
+lineIdx = 1
+for notebook in notebooks:
+    if lineIdx != 1:
+        vim.current.buffer.append("")
+    vim.current.buffer.append("NOTEBOOK   [" + notebook.name + "]")
+    lineIdx += 2
+    for note in allNotes[notebook.guid]:
+        vim.current.buffer.append("           <" + note.title + ">")
+        backRef[lineIdx] = (notebook, note)
+        lineIdx += 1
+vim.command('setlocal readonly')
+vim.command("nnoremap <buffer> <silent> <CR> :call <SID>open_note(line('.'))<CR>")
+vim.command("nnoremap <buffer> <silent> r :call <SID>display_note_list()<CR>")
+EOF
+endfunction
+
+function! s:open_note(lineNum)
+python << EOF
+hintLine = int(vim.eval("a:lineNum"))
+if backRef.has_key(hintLine):
+    (notebook, note) = backRef[hintLine]
+    realNote = noteStore.getNote(authToken, note.guid, 1, 0, 0, 0)
+    vim.command('setlocal noreadonly')
+    del vim.current.buffer[0:len(vim.current.buffer)]
+    lines = realNote.content.split('\n')
+    vim.current.buffer[0] = lines[0]
+    for line in lines[1:]:
+        vim.current.buffer.append(line)
+    vim.command('setlocal readonly')
+elif debugLogging:
+    print "no back ref for %d" % hintLine
 EOF
 endfunction
 
 call s:authenticate_user()
-call s:list_notes()
-
-" noteStore = getNoteStore(user.shardId)
-" 
-" notebooks = noteStore.listNotebooks(authToken)
-" print "Found ", len(notebooks), " notebooks:"
-" allNotes = []
-" for notebook in notebooks:
-"     print "  * ", notebook.name
-"     if notebook.defaultNotebook:
-"         defaultNotebook = notebook
-" 
-"     filter = NoteStore.NoteFilter()
-"     filter.notebookGuid = notebook.guid
-"     noteLst = noteStore.findNotes(authToken, filter, 0, 100)
-"     for note in noteLst.notes:
-"         if debugLogging:
-"             print "------------  title  -------------"
-"             print note.title
-"             print "------------ content -------------"
-"             print note.content
-"         allNotes.append(note)
-
-" import vim
-" vim.command('vertical split _EVERNOTE_LIST_')
-" for note in allNotes:
-"     vim.buffers[-1].append(note.title)
+call s:get_note_list()
+call s:display_note_list()
 
 " print
 " print "Creating a new note in default notebook: ", defaultNotebook.name

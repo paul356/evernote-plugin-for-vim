@@ -14,7 +14,7 @@ import evernote.edam.error.ttypes as Errors
 
 username = 'test356'
 password = 'test356'
-debugLogging = False
+debugLogging = True
 
 #
 # NOTE: You must change the consumer key and consumer secret to the 
