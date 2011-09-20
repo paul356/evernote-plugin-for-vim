@@ -68,7 +68,8 @@ endfunction
 
 function! s:display_note_list()
 python << EOF
-vim.command('leftabove vertical split ' + evernoteBufferName)
+if not evernoteBufferName in vim.current.buffer.name:
+    vim.command('leftabove vertical split ' + evernoteBufferName)
 vim.command('set nowrap')
 vim.command('vertical res 40')
 vim.command('setlocal buftype=nofile')
