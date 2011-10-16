@@ -7,6 +7,7 @@ import evernote.edam.notestore.NoteStore as NoteStore
 import evernote.edam.type.ttypes as Types
 import evernote.edam.error.ttypes as Errors
 import vim
+import re
 from evernoteapi import *
 
 userShardId = ''
@@ -93,6 +94,12 @@ vim.command("nnoremap <buffer> <silent> r :call <SID>display_note_list()<CR>")
 EOF
 endfunction
 
+python << EOF
+def compatMark(markStr):
+    str = [i for i in markStr if i != " " and i != "\n" and i != "\t"]
+    return "".join(str)
+EOF
+
 function! s:open_note(lineNum)
 python << EOF
 hintLine = int(vim.eval("a:lineNum"))
@@ -102,9 +109,29 @@ if backRef.has_key(hintLine):
     vim.command('setlocal noreadonly')
     del vim.current.buffer[0:len(vim.current.buffer)]
     lines = realNote.content.split('\n')
-    vim.current.buffer[0] = lines[0]
-    for line in lines[1:]:
-        vim.current.buffer.append(line)
+    content = "".join(lines)
+    print content
+    enNoteStart = re.search(r"<\s*en-note\s*>", content)
+    content = content[enNoteStart.end():]
+    matchIter = re.finditer(r"<[^>]*>", content)
+    currLine = ""
+    lastEnd  = 0
+    for match in matchIter:
+        print match.group(0)
+        compatMatch = compatMark(match.group(0))
+        if compatMatch == "</en-note>":
+            currLine += content[lastEnd:match.start()]
+            vim.current.buffer.append(currLine)
+            break
+        elif compatMatch == "</p>" or compatMatch == "<br/>" or compatMatch == "</li>":
+            currLine += content[lastEnd:match.start()]
+            vim.current.buffer.append(currLine)
+            print currLine
+            currLine  = ""
+            lastEnd = match.end()
+        else:
+            currLine += content[lastEnd:match.start()]
+            lastEnd = match.end()
     vim.command('setlocal readonly')
 elif debugLogging:
     print "no back ref for %d" % hintLine
