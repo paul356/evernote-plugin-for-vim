@@ -20,6 +20,7 @@ noteStore   = None
 evernoteBufferName = '__EVERNOTE_LIST__'
 EOF
 
+" The authentication function
 function! s:authenticate_user()
 python << EOF
 authFilePath = '/tmp/.evernote_auth'
@@ -40,12 +41,17 @@ authFile.close()
 EOF
 endfunction
 
+" get the note list from evernote
 function! s:get_note_list()
 python << EOF
 noteStore = getNoteStore(userShardId)
 
 notebooks = noteStore.listNotebooks(authToken)
+# Dictionary used to store notebooks.
+# Take notebook guid as key, and allNotes[notebook.guid] is the list of notes.
 allNotes  = {}
+# backRef is the back reference from the line number to the note
+# Take line number as key, and backRef[line] is a pair (pointer to note, pointer to notebook)
 backRef   = {}
 if debugLogging:
     print "Found %d notebooks:" % len(notebooks)
@@ -110,23 +116,32 @@ if backRef.has_key(hintLine):
     del vim.current.buffer[0:len(vim.current.buffer)]
     lines = realNote.content.split('\n')
     content = "".join(lines)
-    print content
+#    print content
     enNoteStart = re.search(r"<\s*en-note\s*>", content)
     content = content[enNoteStart.end():]
     matchIter = re.finditer(r"<[^>]*>", content)
     currLine = ""
     lastEnd  = 0
+    firstLine = True
     for match in matchIter:
-        print match.group(0)
+#        print match.group(0)
         compatMatch = compatMark(match.group(0))
         if compatMatch == "</en-note>":
             currLine += content[lastEnd:match.start()]
-            vim.current.buffer.append(currLine)
+            if firstLine:
+                vim.current.buffer[0] = currLine
+                firstLine = False
+            else:
+                vim.current.buffer.append(currLine)
             break
         elif compatMatch == "</p>" or compatMatch == "<br/>" or compatMatch == "</li>":
             currLine += content[lastEnd:match.start()]
-            vim.current.buffer.append(currLine)
-            print currLine
+            if firstLine:
+                vim.current.buffer[0] = currLine
+                firstLine = False
+            else:
+                vim.current.buffer.append(currLine)
+#            print currLine
             currLine  = ""
             lastEnd = match.end()
         else:
