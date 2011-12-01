@@ -17,7 +17,8 @@ allNotes    = {}
 backRef     = {}
 bufIdx      = -1
 noteStore   = None
-evernoteBufferName = '__EVERNOTE_LIST__'
+evernoteListName = '__EVERNOTE_LIST__'
+evernoteBufferName = '__EVERNOTE_NOTE__'
 EOF
 
 " The authentication function
@@ -75,8 +76,8 @@ endfunction
 
 function! s:display_note_list()
 python << EOF
-if not evernoteBufferName in vim.current.buffer.name:
-    vim.command('leftabove vertical split ' + evernoteBufferName)
+if not evernoteListName in vim.current.buffer.name:
+    vim.command('leftabove vertical split ' + evernoteListName)
 vim.command('set nowrap')
 vim.command('vertical res 40')
 vim.command('setlocal buftype=nofile')
@@ -112,7 +113,18 @@ hintLine = int(vim.eval("a:lineNum"))
 if backRef.has_key(hintLine):
     (notebook, note) = backRef[hintLine]
     realNote = noteStore.getNote(authToken, note.guid, 1, 0, 0, 0)
-    vim.command('setlocal noreadonly')
+    lastWin = vim.eval("winnr()")
+    # see if exist a right window
+    vim.command('wincmd l')
+    currWin = vim.eval("winnr()")
+    if (lastWin == currWin):
+        # no window to the right
+        vim.commmand("rightbelow vertical split " + evernoteBufferName)
+        vim.command('setlocal noreadonly')
+        vim.command('setlocal buftype=nofile')
+        vim.command('setlocal noswapfile')
+        currWin = vim.eval("winnr()")
+
     del vim.current.buffer[0:len(vim.current.buffer)]
     lines = realNote.content.split('\n')
     content = "".join(lines)
