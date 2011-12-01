@@ -79,7 +79,7 @@ python << EOF
 if not evernoteListName in vim.current.buffer.name:
     vim.command('leftabove vertical split ' + evernoteListName)
 vim.command('set nowrap')
-vim.command('vertical res 40')
+vim.command('vertical res 30')
 vim.command('setlocal buftype=nofile')
 vim.command('setlocal noswapfile')
 vim.command('setlocal noreadonly')
@@ -119,10 +119,13 @@ if backRef.has_key(hintLine):
     currWin = vim.eval("winnr()")
     if (lastWin == currWin):
         # no window to the right
-        vim.commmand("rightbelow vertical split " + evernoteBufferName)
+        vim.command("rightbelow vertical split " + evernoteBufferName)
         vim.command('setlocal noreadonly')
         vim.command('setlocal buftype=nofile')
         vim.command('setlocal noswapfile')
+        vim.command('wincmd h')
+        vim.command('vertical res 30')
+        vim.command('wincmd l')
         currWin = vim.eval("winnr()")
 
     del vim.current.buffer[0:len(vim.current.buffer)]
