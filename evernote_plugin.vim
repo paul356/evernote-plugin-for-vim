@@ -119,7 +119,7 @@ if backRef.has_key(hintLine):
     currWin = vim.eval("winnr()")
     if (lastWin == currWin):
         # no window to the right
-        vim.commmand("rightbelow vertical split " + evernoteBufferName)
+        vim.command("rightbelow vertical split " + evernoteBufferName)
         vim.command('setlocal noreadonly')
         vim.command('setlocal buftype=nofile')
         vim.command('setlocal noswapfile')
