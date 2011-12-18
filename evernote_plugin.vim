@@ -18,7 +18,7 @@ backRef     = {}
 bufIdx      = -1
 noteStore   = None
 evernoteListName = '__EVERNOTE_LIST__'
-evernoteBufferName = '__EVERNOTE_NOTE__'
+evernoteBufferTemplate = '__EVERNOTE_NOTE__ [%s]'
 EOF
 
 " The authentication function
@@ -89,10 +89,10 @@ lineIdx = 1
 for notebook in notebooks:
     if lineIdx != 1:
         vim.current.buffer.append("")
-    vim.current.buffer.append("NOTEBOOK   [" + notebook.name + "]")
+    vim.current.buffer.append("+- [" + notebook.name + "]")
     lineIdx += 2
     for note in allNotes[notebook.guid]:
-        vim.current.buffer.append("           <" + note.title + ">")
+        vim.current.buffer.append("|- <" + note.title + ">")
         backRef[lineIdx] = (notebook, note)
         lineIdx += 1
 vim.command('setlocal readonly')
@@ -117,16 +117,20 @@ if backRef.has_key(hintLine):
     # see if exist a right window
     vim.command('wincmd l')
     currWin = vim.eval("winnr()")
+    winName = evernoteBufferTemplate % note.title
     if (lastWin == currWin):
         # no window to the right
-        vim.command("rightbelow vertical split " + evernoteBufferName)
-        vim.command('setlocal noreadonly')
-        vim.command('setlocal buftype=nofile')
-        vim.command('setlocal noswapfile')
-        vim.command('wincmd h')
-        vim.command('vertical res 30')
-        vim.command('wincmd l')
-        currWin = vim.eval("winnr()")
+        vim.command("rightbelow vertical split " + winName)
+    else:
+        vim.command('edit ' + winName)
+    vim.command('setlocal noreadonly')
+    vim.command('setlocal buftype=nofile')
+    vim.command('setlocal noswapfile')
+    # set width of left window to 30
+    vim.command('wincmd h')
+    vim.command('vertical res 30')
+    vim.command('wincmd l')
+    currWin = vim.eval("winnr()")
 
     del vim.current.buffer[0:len(vim.current.buffer)]
     lines = realNote.content.split('\n')
