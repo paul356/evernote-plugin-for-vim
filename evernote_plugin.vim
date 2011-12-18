@@ -43,7 +43,7 @@ EOF
 function! g:dump_buffer()
 python << EOF
 i = 0
-for line in vim.current.buffer
+for line in vim.current.buffer:
     print "%d %s" % (i, line)
     i += 1
 EOF
@@ -204,8 +204,8 @@ newNote.guid = note.guid
 newNote.title = note.title
 content = ""
 for line in vim.current.buffer:
-    content += line
-noteStore.content = evernoteNoteTemaplateBegin + content + evernoteNoteTemaplateEnd
+    content += line + "<br/>"
+newNote.content = evernoteNoteTemaplateBegin + content + evernoteNoteTemaplateEnd
 noteStore.updateNote(authToken, newNote)
 EOF
 endfunction
