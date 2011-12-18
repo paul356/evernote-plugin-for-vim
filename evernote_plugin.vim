@@ -13,13 +13,41 @@ from evernoteapi import *
 userShardId = ''
 authToken   = ''
 notebooks   = []
+# {'guid' => [notes in a notebook]}
 allNotes    = {}
 backRef     = {}
 bufIdx      = -1
 noteStore   = None
 evernoteListName = '__EVERNOTE_LIST__'
-evernoteBufferTemplate = '__EVERNOTE_NOTE__ [%s]'
+evernoteNameTemplate = '__EVERNOTE_NOTE__ [%s]'
+
+evernoteNoteTemaplateBegin = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
+<en-note>"""
+evernoteNoteTemaplateEnd = """
+</en-note>"""
+
+def compatMark(markStr):
+    str = [i for i in markStr if i != " " and i != "\n" and i != "\t"]
+    return "".join(str)
+
+def findNote(guid):
+    for notebook in notebooks:
+        for note in allNotes[notebook.guid]:
+            if note.guid == guid:
+                return note
+    return None
+
 EOF
+
+function! g:dump_buffer()
+python << EOF
+i = 0
+for line in vim.current.buffer
+    print "%d %s" % (i, line)
+    i += 1
+EOF
+endfunction
 
 " The authentication function
 function! s:authenticate_user()
@@ -76,12 +104,11 @@ endfunction
 
 function! s:display_note_list()
 python << EOF
-if not evernoteListName in vim.current.buffer.name:
+if vim.current.buffer.name == None or not evernoteListName in vim.current.buffer.name:
     vim.command('leftabove vertical split ' + evernoteListName)
 vim.command('set nowrap')
 vim.command('vertical res 30')
-vim.command('setlocal buftype=nofile')
-vim.command('setlocal noswapfile')
+vim.command('setlocal buftype=nowrite')
 vim.command('setlocal noreadonly')
 
 del vim.current.buffer[0:len(vim.current.buffer)]
@@ -101,12 +128,6 @@ vim.command("nnoremap <buffer> <silent> r :call <SID>display_note_list()<CR>")
 EOF
 endfunction
 
-python << EOF
-def compatMark(markStr):
-    str = [i for i in markStr if i != " " and i != "\n" and i != "\t"]
-    return "".join(str)
-EOF
-
 function! s:open_note(lineNum)
 python << EOF
 hintLine = int(vim.eval("a:lineNum"))
@@ -117,25 +138,25 @@ if backRef.has_key(hintLine):
     # see if exist a right window
     vim.command('wincmd l')
     currWin = vim.eval("winnr()")
-    winName = evernoteBufferTemplate % note.title
+    winName = evernoteNameTemplate % note.title
     if (lastWin == currWin):
         # no window to the right
         vim.command("rightbelow vertical split " + winName)
     else:
         vim.command('edit ' + winName)
     vim.command('setlocal noreadonly')
-    vim.command('setlocal buftype=nofile')
-    vim.command('setlocal noswapfile')
+    vim.command('setlocal buftype=nowrite')
     # set width of left window to 30
     vim.command('wincmd h')
     vim.command('vertical res 30')
     vim.command('wincmd l')
     currWin = vim.eval("winnr()")
+    vim.command('let b:noteGuid = "' + note.guid + '"')
 
     del vim.current.buffer[0:len(vim.current.buffer)]
     lines = realNote.content.split('\n')
     content = "".join(lines)
-#    print content
+    #print content
     enNoteStart = re.search(r"<\s*en-note\s*>", content)
     content = content[enNoteStart.end():]
     matchIter = re.finditer(r"<[^>]*>", content)
@@ -143,7 +164,7 @@ if backRef.has_key(hintLine):
     lastEnd  = 0
     firstLine = True
     for match in matchIter:
-#        print match.group(0)
+        #print match.group(0)
         compatMatch = compatMark(match.group(0))
         if compatMatch == "</en-note>":
             currLine += content[lastEnd:match.start()]
@@ -160,21 +181,39 @@ if backRef.has_key(hintLine):
                 firstLine = False
             else:
                 vim.current.buffer.append(currLine)
-#            print currLine
+            #print currLine
             currLine  = ""
             lastEnd = match.end()
         else:
             currLine += content[lastEnd:match.start()]
             lastEnd = match.end()
-    vim.command('setlocal readonly')
 elif debugLogging:
     print "no back ref for %d" % hintLine
+EOF
+endfunction
+
+function! s:update_note()
+if !exists('b:noteGuid')
+    print "This buffer is for evernote!!!"
+endif
+python << EOF
+guid = vim.eval("b:noteGuid")
+note = findNote(guid)
+newNote = Types.Note()
+newNote.guid = note.guid
+newNote.title = note.title
+content = ""
+for line in vim.current.buffer:
+    content += line
+noteStore.content = evernoteNoteTemaplateBegin + content + evernoteNoteTemaplateEnd
+noteStore.updateNote(authToken, newNote)
 EOF
 endfunction
 
 call s:authenticate_user()
 call s:get_note_list()
 call s:display_note_list()
+command! -nargs=0 -bar PushNote call s:update_note()
 
 " print
 " print "Creating a new note in default notebook: ", defaultNotebook.name
