@@ -10,17 +10,18 @@ import vim
 import re
 from evernoteapi import *
 
+noteStore   = None
 userShardId = ''
 authToken   = ''
 notebooks   = []
+defaultNotebook = None
 # {'guid' => [notes in a notebook]}
 allNotes    = {}
 backRef     = {}
-bufIdx      = -1
-noteStore   = None
 evernoteListName = '__EVERNOTE_LIST__'
 evernoteNameTemplate = '__EVERNOTE_NOTE__ [%s]'
 
+# evernote use xml to store note content
 evernoteNoteTemaplateBegin = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">
 <en-note>"""
@@ -38,6 +39,32 @@ def findNote(guid):
                 return note
     return None
 
+def getNotebookByName(notebookName):
+    for notebook in notebooks:
+        if (notebookName == notebook.name):
+            return notebook
+    return None
+
+def insertBackref(note):
+    backKeys = backRef.keys()
+    backKeys.sort()
+    lastIdx = -1
+    idx = 0
+    ln = len(backKeys)
+    while idx < ln:
+        key = backKeys[idx]
+        if backRef[key][0].guid == createdNote.notebookGuid:
+            lastIdx = idx
+        elif lastKey != -1:
+            break
+        idx += 1
+    idx = ln-1
+    while idx > lastIdx:
+        backRef[backKeys[idx]+1] = backRef[backKeys[idx]]
+        if not backRef.has_key(backKeys[idx]-1):
+            del backRef[backKeys[idx]]
+        idx -= 1
+    backRef[backKeys[lastIdx]+1] = (backKeys[lastIdx][0], createdNote)
 EOF
 
 function! g:dump_buffer()
@@ -88,6 +115,9 @@ for notebook in notebooks:
     if debugLogging:
         print "  * " + notebook.name
 
+    if notebook.defaultNotebook:
+        defaultNotebook = notebook
+
     filter = NoteStore.NoteFilter()
     filter.notebookGuid = notebook.guid
     noteLst = noteStore.findNotes(authToken, filter, 0, 200)
@@ -116,8 +146,10 @@ lineIdx = 1
 for notebook in notebooks:
     if lineIdx != 1:
         vim.current.buffer.append("")
+    lineIdx += 1
     vim.current.buffer.append("+- [" + notebook.name + "]")
-    lineIdx += 2
+    backRef[lineIdx] = (notebook, None)
+    lineIdx += 1
     for note in allNotes[notebook.guid]:
         vim.current.buffer.append("|- <" + note.title + ">")
         backRef[lineIdx] = (notebook, note)
@@ -131,8 +163,16 @@ endfunction
 function! s:open_note(lineNum)
 python << EOF
 hintLine = int(vim.eval("a:lineNum"))
+(notebook, note) = (None, None)
 if backRef.has_key(hintLine):
     (notebook, note) = backRef[hintLine]
+elif debugLogging:
+    print "no back ref for %d" % hintLine
+
+if (note == None):
+    if notebook != None && debugLogging:
+        print "line %d refer to a notebook" % hintLine
+else:
     realNote = noteStore.getNote(authToken, note.guid, 1, 0, 0, 0)
     lastWin = vim.eval("winnr()")
     # see if exist a right window
@@ -150,6 +190,7 @@ if backRef.has_key(hintLine):
     vim.command('wincmd h')
     vim.command('vertical res 30')
     vim.command('wincmd l')
+    # TODO: associate buffer with evernote
     currWin = vim.eval("winnr()")
     vim.command('let b:noteGuid = "' + note.guid + '"')
 
@@ -157,6 +198,7 @@ if backRef.has_key(hintLine):
     lines = realNote.content.split('\n')
     content = "".join(lines)
     #print content
+    # TODO: refactor the following code
     enNoteStart = re.search(r"<\s*en-note\s*>", content)
     content = content[enNoteStart.end():]
     matchIter = re.finditer(r"<[^>]*>", content)
@@ -187,14 +229,12 @@ if backRef.has_key(hintLine):
         else:
             currLine += content[lastEnd:match.start()]
             lastEnd = match.end()
-elif debugLogging:
-    print "no back ref for %d" % hintLine
 EOF
 endfunction
 
 function! s:update_note()
 if !exists('b:noteGuid')
-    print "This buffer is for evernote!!!"
+    echo "ERROR: This document is not in evernote!"
 endif
 python << EOF
 guid = vim.eval("b:noteGuid")
@@ -210,10 +250,47 @@ noteStore.updateNote(authToken, newNote)
 EOF
 endfunction
 
+function! s:add_note(noteTitle, notebookName)
+if exists('b:noteGuid')
+    echo "ERROR: This document is already in evernote!"
+    echo "ERROR: If you want to update it, use :UpdateNote"
+endif
+python << EOF
+title = vim.eval("a:noteTitle")
+notebookName = vim.eval("a:notebookName")
+
+# set title of new note
+newNote = Types.Note()
+if (title == ''):
+    newNote.title = 'NewNote'
+else:
+    newNote.title = title
+
+# get notebook for new note, or use default
+if (notebookName != ''):
+    notebook = getNotebookByName(notebookName)
+    if notebook != None:
+        newNote.notebookGuid = notebook.guid
+
+# use content of current buffer as new note content
+content = ""
+for line in vim.current.buffer:
+    content += line + "<br/>"
+newNote.content = evernoteNoteTemaplateBegin + content + evernoteNoteTemaplateEnd
+createdNote = noteStore.createNote(authToken, newNote)
+
+# add new note's guid to backRef and allNotes
+allNotes[createdNote.notebookGuid].append(createdNote)
+insertBackref(createdNote)
+vim.command("s:display_note_list")
+EOF
+endfunction
+
 call s:authenticate_user()
 call s:get_note_list()
 call s:display_note_list()
-command! -nargs=0 -bar PushNote call s:update_note()
+command! -nargs=0 -bar UpdateNote call s:update_note()
+command! -nargs=0 -bar AddNote call s:add_note()
 
 " print
 " print "Creating a new note in default notebook: ", defaultNotebook.name
