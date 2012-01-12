@@ -55,7 +55,7 @@ def insertBackref(note):
         key = backKeys[idx]
         if backRef[key][0].guid == createdNote.notebookGuid:
             lastIdx = idx
-        elif lastKey != -1:
+        elif lastIdx != -1:
             break
         idx += 1
     idx = ln-1
@@ -138,6 +138,7 @@ if vim.current.buffer.name == None or not evernoteListName in vim.current.buffer
     vim.command('leftabove vertical split ' + evernoteListName)
 vim.command('set nowrap')
 vim.command('vertical res 30')
+vim.command('setlocal noswapfile')
 vim.command('setlocal buftype=nowrite')
 vim.command('setlocal noreadonly')
 
@@ -170,7 +171,7 @@ elif debugLogging:
     print "no back ref for %d" % hintLine
 
 if (note == None):
-    if notebook != None && debugLogging:
+    if notebook != None and debugLogging:
         print "line %d refer to a notebook" % hintLine
 else:
     realNote = noteStore.getNote(authToken, note.guid, 1, 0, 0, 0)
@@ -185,6 +186,7 @@ else:
     else:
         vim.command('edit ' + winName)
     vim.command('setlocal noreadonly')
+    vim.command('setlocal noswapfile')
     vim.command('setlocal buftype=nowrite')
     # set width of left window to 30
     vim.command('wincmd h')
@@ -290,7 +292,7 @@ call s:authenticate_user()
 call s:get_note_list()
 call s:display_note_list()
 command! -nargs=0 -bar UpdateNote call s:update_note()
-command! -nargs=0 -bar AddNote call s:add_note()
+command! -nargs=0 -bar AddNote call s:add_note("", "")
 
 " print
 " print "Creating a new note in default notebook: ", defaultNotebook.name
