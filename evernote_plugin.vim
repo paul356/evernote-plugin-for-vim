@@ -252,14 +252,24 @@ noteStore.updateNote(authToken, newNote)
 EOF
 endfunction
 
-function! s:add_note(noteTitle, notebookName)
+function! s:add_note(...)
 if exists('b:noteGuid')
     echo "ERROR: This document is already in evernote!"
     echo "ERROR: If you want to update it, use :UpdateNote"
 endif
+if a:0 >= 1
+    let l:noteName=a:1
+endif
+if a:0 >= 2
+    let l:notebookName=a:2
+endif
 python << EOF
-title = vim.eval("a:noteTitle")
-notebookName = vim.eval("a:notebookName")
+title = ''
+if vim.eval("exists(\"l:noteName\")"):
+    title = vim.eval("l:noteName")
+notebookName = ''
+if vim.eval("exists(\"l:notebookName\")"):
+    notebookName = vim.eval("l:notebookName")
 
 # set title of new note
 newNote = Types.Note()
@@ -292,7 +302,7 @@ call s:authenticate_user()
 call s:get_note_list()
 call s:display_note_list()
 command! -nargs=0 -bar UpdateNote call s:update_note()
-command! -nargs=0 -bar AddNote call s:add_note("", "")
+command! -nargs=* -bar AddNote call s:add_note(<f-args>)
 
 " print
 " print "Creating a new note in default notebook: ", defaultNotebook.name
