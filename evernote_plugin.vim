@@ -135,8 +135,29 @@ endfunction
 
 function! s:display_note_list()
 python << EOF
-if vim.current.buffer.name == None or not evernoteListName in vim.current.buffer.name:
+noteListBuf = None
+noteListWin = None
+# get the buffer for the note list
+for buf in vim.buffers:
+    if buf.name.endswith(evernoteListName):
+        noteListBuf = buf
+# check if a window is already associated with the note list buffer
+if noteListBuf != None:
+    for win in vim.windows:
+        if win.buffer.name.endswith(evernoteListName):
+            noteListWin = win
+# create a new window or swith to the window
+if noteListWin == None:
     vim.command('leftabove vertical split ' + evernoteListName)
+else:
+    # loop to the note list window
+    if not vim.current.buffer.name.endswith(evernoteListName):
+        vim.command('wincmd w')
+        while not vim.current.buffer.name.endswith(evernoteListName):
+            print "come to window %s" % vim.current.buffer.name
+            vim.command('wincmd w')
+    if noteListWin == None:
+        vim.command('b ' + evernoteListName)
 vim.command('set nowrap')
 vim.command('vertical res 30')
 vim.command('setlocal noswapfile')
@@ -158,7 +179,7 @@ for notebook in notebooks:
         lineIdx += 1
 vim.command('setlocal readonly')
 vim.command("nnoremap <buffer> <silent> <CR> :call <SID>s:open_note(line('.'))<CR>")
-vim.command("nnoremap <buffer> <silent> r :call <SID>s:display_note_list()<CR>")
+vim.command("nnoremap <buffer> <silent> r :call <SID>display_note_list()<CR>")
 EOF
 endfunction
 
@@ -266,10 +287,10 @@ if a:0 >= 2
 endif
 python << EOF
 title = ''
-if vim.eval("exists(\"l:noteName\")"):
+if vim.eval("exists(\"l:noteName\")") == '1':
     title = vim.eval("l:noteName")
 notebookName = ''
-if vim.eval("exists(\"l:notebookName\")"):
+if vim.eval("exists(\"l:notebookName\")") == '1':
     notebookName = vim.eval("l:notebookName")
 
 # set title of new note
