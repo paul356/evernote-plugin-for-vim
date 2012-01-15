@@ -58,13 +58,14 @@ def insertBackref(note):
         elif lastIdx != -1:
             break
         idx += 1
+    print "last idx is %d" % lastIdx
     idx = ln-1
     while idx > lastIdx:
         backRef[backKeys[idx]+1] = backRef[backKeys[idx]]
         if not backRef.has_key(backKeys[idx]-1):
             del backRef[backKeys[idx]]
         idx -= 1
-    backRef[backKeys[lastIdx]+1] = (backKeys[lastIdx][0], createdNote)
+    backRef[backKeys[lastIdx]+1] = (backRef[backKeys[lastIdx]][0], createdNote)
 EOF
 
 function! g:dump_buffer()
@@ -156,8 +157,8 @@ for notebook in notebooks:
         backRef[lineIdx] = (notebook, note)
         lineIdx += 1
 vim.command('setlocal readonly')
-vim.command("nnoremap <buffer> <silent> <CR> :call <SID>open_note(line('.'))<CR>")
-vim.command("nnoremap <buffer> <silent> r :call <SID>display_note_list()<CR>")
+vim.command("nnoremap <buffer> <silent> <CR> :call <SID>s:open_note(line('.'))<CR>")
+vim.command("nnoremap <buffer> <silent> r :call <SID>s:display_note_list()<CR>")
 EOF
 endfunction
 
@@ -294,7 +295,7 @@ createdNote = noteStore.createNote(authToken, newNote)
 # add new note's guid to backRef and allNotes
 allNotes[createdNote.notebookGuid].append(createdNote)
 insertBackref(createdNote)
-vim.command("s:display_note_list")
+vim.command("call s:display_note_list()")
 EOF
 endfunction
 
