@@ -32,6 +32,64 @@ def compatMark(markStr):
     str = [i for i in markStr if i != " " and i != "\n" and i != "\t"]
     return "".join(str)
 
+def escapeXML(character):
+    if character == '"':
+        return "&quot;"
+    elif character == "<":
+        return "&lt;"
+    elif character == ">":
+        return "&gt;"
+    elif character == '&':
+        return "&amp;"
+    elif character == "'":
+        return "&apos;"
+    else:
+        return character
+
+def escapeLine(line):
+    length = len(line)
+    i = 0
+    retStr = ""
+    while i<length:
+        retStr += escapeXML(line[i])
+        i += 1
+    return retStr
+
+def unescapeLine(line):
+    length = len(line)
+    i = 0
+    retStr = ""
+    while i<length:
+        if line[i] == '&':
+            specialCharacter = True
+            if (len-1-i) >= 2 and line[i+1:i+3] == 'lt':
+                retStr += '<'
+                i += 2
+            elif (len-1-i) >= 2 and line[i+1:i+3] == 'gt':
+                retStr += '>'
+                i += 2
+            elif (len-1-i) >= 3 and line[i+1:i+4] == 'amp':
+                retStr += '&'
+                i += 3
+            elif (len-1-i) >= 4 and line[i+1:i+5] == 'quot':
+                retStr += '"'
+                i += 4
+            elif (len-1-i) >= 4 and line[i+1:i+5] == 'apos':
+                retStr += "'"
+                i += 4
+            else:
+                retStr += line[i]
+                specialCharacter = False
+                i += 1
+            if specialCharacter == True and (len-1-i) >= 1 and line[i] == ';':
+                i += 1
+        else:
+            retStr += line[i]
+            specialCharacter = False
+            i += 1
+                
+    return retStr
+
 def findNote(guid):
     for notebook in notebooks:
         for note in allNotes[notebook.guid]:
@@ -178,7 +236,7 @@ for notebook in notebooks:
         backRef[lineIdx] = (notebook, note)
         lineIdx += 1
 vim.command('setlocal readonly')
-vim.command("nnoremap <buffer> <silent> <CR> :call <SID>s:open_note(line('.'))<CR>")
+vim.command("nnoremap <buffer> <silent> <CR> :call <SID>open_note(line('.'))<CR>")
 vim.command("nnoremap <buffer> <silent> r :call <SID>display_note_list()<CR>")
 EOF
 endfunction
@@ -234,6 +292,8 @@ else:
         compatMatch = compatMark(match.group(0))
         if compatMatch == "</en-note>":
             currLine += content[lastEnd:match.start()]
+            currLine = unescapeLine(currLine)
+            #print currLine
             if firstLine:
                 vim.current.buffer[0] = currLine
                 firstLine = False
@@ -242,12 +302,13 @@ else:
             break
         elif compatMatch == "</p>" or compatMatch == "<br/>" or compatMatch == "</li>":
             currLine += content[lastEnd:match.start()]
+            #print currLine
+            currLine = unescapeLine(currLine)
             if firstLine:
                 vim.current.buffer[0] = currLine
                 firstLine = False
             else:
                 vim.current.buffer.append(currLine)
-            #print currLine
             currLine  = ""
             lastEnd = match.end()
         else:
@@ -309,7 +370,7 @@ if (notebookName != ''):
 # use content of current buffer as new note content
 content = ""
 for line in vim.current.buffer:
-    content += line + "<br/>"
+    content += escapeLine(line) + "<br/>"
 newNote.content = evernoteNoteTemaplateBegin + content + evernoteNoteTemaplateEnd
 createdNote = noteStore.createNote(authToken, newNote)
 
