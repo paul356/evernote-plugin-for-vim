@@ -62,26 +62,26 @@ def unescapeLine(line):
     while i<length:
         if line[i] == '&':
             specialCharacter = True
-            if (len-1-i) >= 2 and line[i+1:i+3] == 'lt':
+            if (length-1-i) >= 2 and line[i+1:i+3] == 'lt':
                 retStr += '<'
-                i += 2
-            elif (len-1-i) >= 2 and line[i+1:i+3] == 'gt':
-                retStr += '>'
-                i += 2
-            elif (len-1-i) >= 3 and line[i+1:i+4] == 'amp':
-                retStr += '&'
                 i += 3
-            elif (len-1-i) >= 4 and line[i+1:i+5] == 'quot':
+            elif (length-1-i) >= 2 and line[i+1:i+3] == 'gt':
+                retStr += '>'
+                i += 3
+            elif (length-1-i) >= 3 and line[i+1:i+4] == 'amp':
+                retStr += '&'
+                i += 4
+            elif (length-1-i) >= 4 and line[i+1:i+5] == 'quot':
                 retStr += '"'
-                i += 4
-            elif (len-1-i) >= 4 and line[i+1:i+5] == 'apos':
+                i += 5
+            elif (length-1-i) >= 4 and line[i+1:i+5] == 'apos':
                 retStr += "'"
-                i += 4
+                i += 5
             else:
                 retStr += line[i]
                 specialCharacter = False
                 i += 1
-            if specialCharacter == True and (len-1-i) >= 1 and line[i] == ';':
+            if specialCharacter == True and (length-i) >= 1 and line[i] == ';':
                 i += 1
         else:
             retStr += line[i]
